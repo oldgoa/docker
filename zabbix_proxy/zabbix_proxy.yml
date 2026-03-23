@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  mysql-proxy-db:
+    image: mysql:8.0
+    container_name: zabbix-proxy-mysql-db
+    networks:
+       zabbix-net:
+         ipv4_address: 172.20.0.10
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: zabbix_proxy
+      MYSQL_USER: zabbix_proxy
+      MYSQL_PASSWORD: password
+    volumes:
+      - mysql_proxy_data:/var/lib/mysql
+      - ./proxy.sql:/docker-entrypoint-initdb.d/proxy.sql:ro
+    restart: unless-stopped
+
+  zabbix-proxy:
+    image: zabbix/zabbix-proxy-mysql:alpine-7.0-latest
+    container_name: zabbix-proxy
+    networks:
+       zabbix-net:
+         ipv4_address: 172.20.0.20
+    environment:
+      DB_SERVER_HOST: mysql-proxy-db
+      MYSQL_DATABASE: zabbix_proxy
+      MYSQL_USER: zabbix_proxy
+      MYSQL_PASSWORD: password
+      ZBX_SERVER_HOST: 192.168.1.2
+      ZBX_HOSTNAME: Zabbix_Proxy
+      ZBX_PROXYOFFLINEBUFFER: "5"
+      ZBX_CONFIGFREQUENCY: "600"
+      ZBX_STARTPOLLERS: "30"
+      ZBX_STARTPOLLERSUNREACHABLE: "15"
+      ZBX_STARTPINGERS: "5"
+      ZBX_STARTDISCOVERERS: "10"
+      ZBX_STARTVMWARECOLLECTORS: "3"
+      ZBX_VMWAREFREQUENCY: "60"
+      ZBX_VMWARECACHESIZE: "32M"
+      ZBX_CACHESIZE: "512M"
+      ZBX_TIMEOUT: "5"
+      ZBX_LOGSLOWQUERIES: "3000"
+    volumes:
+      - /usr/lib/zabbix/externalscripts:/usr/lib/zabbix/externalscripts
+    ports:
+      - "10055:10051"
+    depends_on:
+      - mysql-proxy-db
+    restart: unless-stopped
+
+networks:
+  zabbix-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+          gateway: 172.20.0.1
+
+volumes:
+  mysql_proxy_data:
